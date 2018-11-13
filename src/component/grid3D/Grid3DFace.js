@@ -61,7 +61,24 @@ function Grid3DFace(faceInfo, linesMaterial, quadsMaterial) {
         $ignorePicking: true,
         renderOrder: 0
     });
+    var planeMesh = new __WEBPACK_IMPORTED_MODULE_1__util_graphicGL__["a" /* default */].Mesh({
+        geometry: new __WEBPACK_IMPORTED_MODULE_1__util_graphicGL__["a" /* default */].PlaneGeometry(
+            {dynamic: false, widthSegments: 200, heightSegments: 200}
+        ),
+        material: new __WEBPACK_IMPORTED_MODULE_1__util_graphicGL__["a" /* default */].Material({
+            shader: __WEBPACK_IMPORTED_MODULE_1__util_graphicGL__["a" /* default */].createShader('ecgl.lambert'),
+            depthMask: false
+        }),
+        // Render first
+        renderOrder: -100,
+        culling: false,
+        castShadow: false,
+        $ignorePicking: true,
+        renderNormal: false
+    });
+    
     // Quads are behind lines.
+    this.rootNode.add(planeMesh);
     this.rootNode.add(quadsMesh);
     this.rootNode.add(linesMesh);
 
@@ -69,6 +86,7 @@ function Grid3DFace(faceInfo, linesMaterial, quadsMaterial) {
     this.plane =new graphicGL.Plane();
     this.linesMesh =linesMesh;
     this.quadsMesh =quadsMesh;
+    this.planeMesh = planeMesh;
 }
 
 Grid3DFace.prototype.update = function (grid3DModel, ecModel, api) {
@@ -87,6 +105,7 @@ Grid3DFace.prototype.update = function (grid3DModel, ecModel, api) {
     lineGeometry.convertToTypedArray();
     quadsGeometry.convertToTypedArray();
 
+    this._updateSplitPlane(quadsGeometry, axes, grid3DModel, api);
 
     var otherAxis = cartesian.getAxis(this.faceInfo[2]);
     updateFacePlane(this.rootNode, this.plane, otherAxis, this.faceInfo[3]);
@@ -190,5 +209,32 @@ Grid3DFace.prototype._udpateSplitAreas = function (geometry, axes, grid3DModel, 
         }
     });
 };
+
+Grid3DFace.prototype._updateSplitPlane = function (geometry, axes, grid3DModel, api) {
+    var planeStyle = grid3DModel.option.splitArea.planeStyle
+    if (planeStyle && planeStyle.length) {
+        for (var i=0; i<planeStyle.length; i++) {
+            var planeItem = planeStyle[i]
+            if (this.faceInfo[4] === planeItem.type) {
+                this.planeMesh.position.set(0, 0, 0);
+                this.planeMesh.scale.set(planeItem.scale[0], planeItem.scale[1], planeItem.scale[2]);
+                this.planeMesh.rotation.set(planeItem.rotation[0], planeItem.rotation[1], planeItem.rotation[2], planeItem.rotation[3])
+                this.planeMesh.material.enableTexturesAll()
+                this.planeMesh.material.setTextureImage('diffuseMap', planeItem.image, api, {
+                    flipY: false,
+                    anisotropic: 8
+                })
+
+                if (typeof planeItem.fn === 'function') {
+                    planeStyle[i].fn.call(this, geometry, axes, grid3DModel, api)
+                }
+
+                return;
+            }
+        }
+
+        this.planeMesh.scale.set(0, 0, 0);
+    }
+}
 
 export default Grid3DFace;
